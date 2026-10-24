@@ -1484,15 +1484,14 @@ class MyCatBot(Star):
                 self.record_message(event, content, date=today)
             except Exception:
                 logger.error(f"[MyCat] 用户消息落盘异常:\n{traceback.format_exc()}")
-
             ctx, sys_extra = self.build_context(qq, gname, nickname, content, date=today)
-
-            final_sys = BASE_SYSTEM_PROMPT + f"\n\n[SYSTEM INFO]\nCurrent Time: {now.strftime('%Y-%m-%d %H:%M:%S')}"
+            final_sys = BASE_SYSTEM_PROMPT 
+            final_sys += sys_extra 
             if gname:
-                final_sys += f"\n当前是群聊「{gname}」，和你说话的是成员「{nickname}」。"
+                final_sys += f"\n\n当前是群聊「{gname}」，和你说话的是成员「{nickname}」。"
             else:
-                final_sys += f"\n当前是私聊，和你说话的是「{nickname}」。"
-            final_sys += sys_extra
+                final_sys += f"\n\n当前是私聊，和你说话的是「{nickname}」。"
+            final_sys += f"\n\n[SYSTEM INFO]\nCurrent Time: {now.strftime('%Y-%m-%d %H:%M:%S')}"
             final_sys += _wind_down_hint(now)
 
             try:
@@ -2028,7 +2027,12 @@ class MyCatBot(Star):
                     }
             except Exception as e:
                 logger.warning(f"[MyCat] 记忆 JSON 解析失败: {e}")
-        return {"summary": self._one_line(raw), "facts": [], "commitments": []}
+        fallback = self._one_line(raw)
+        if not fallback:
+            # LLM 什么都没返回：这次不推进水位，留着下次重试，别把日志“总结掉”却一个字没记
+            logger.warning("[MyCat] 记忆抽取返回空文本，本次不推进水位")
+            return None
+        return {"summary": fallback, "facts": [], "commitments": []}
 
     async def run_monthly_summary(self):
         now = get_now()
